@@ -55,7 +55,7 @@ export class RandomPlayerAI extends BattlePlayer {
 				));
 
 				if (!canSwitch.length) return `pass`;
-				const target = this.chooseSwitch(
+				const target = this.chooseSwitch(request, 
 					request.active,
 					canSwitch.map(slot => ({slot, pokemon: pokemon[slot - 1]}))
 				);
@@ -77,12 +77,18 @@ export class RandomPlayerAI extends BattlePlayer {
 				canZMove = canZMove && !!active.canZMove;
 				canDynamax = canDynamax && !!active.canDynamax;
 				canTerastallize = canTerastallize && !!active.canTerastallize;
+				
+				canDynamax = false; // comment this out if dynamax is allowed
+				canTerastallize = false; // comment this out if canTerastal is allowed
+
+				let shouldDynamax = this.shouldDynamax(request, canDynamax)
+				let shouldTera  = this.shouldTera(request, canTerastallize)
 
 				// Determine whether we should change form if we do end up switching
-				const change = (canMegaEvo || canUltraBurst || canDynamax) && this.prng.next() < this.mega;
+				const change = (canMegaEvo || canUltraBurst || shouldDynamax || shouldTera) && this.prng.next() < this.mega;
+				
 				// If we've already dynamaxed or if we're planning on potentially dynamaxing
 				// we need to use the maxMoves instead of our regular moves
-
 				const useMaxMoves = (!active.canDynamax && active.maxMoves) || (change && canDynamax);
 				const possibleMoves = useMaxMoves ? active.maxMoves.maxMoves : active.moves;
 
@@ -149,14 +155,24 @@ export class RandomPlayerAI extends BattlePlayer {
 				const switches = active.trapped ? [] : canSwitch;
 
 				if (switches.length && (!moves.length || this.prng.next() > this.move)) {
-					const target = this.chooseSwitch(
+					const target = this.chooseSwitch(request, 
 						active,
 						canSwitch.map(slot => ({slot, pokemon: pokemon[slot - 1]}))
 					);
 					chosen.push(target);
 					return `switch ${target}`;
 				} else if (moves.length) {
-					const move = this.chooseMove(active, moves);
+					const move_canDynamax_canTera = this.chooseMove(request, active, moves, canDynamax, canTerastallize, possibleMoves);
+					if (move_canDynamax_canTera[0] === undefined) {
+						return 'pass'
+					}
+					else if (move_canDynamax_canTera[0].startsWith("switch ")) {
+						return move_canDynamax_canTera[0]
+					}
+					const move = move_canDynamax_canTera[0]
+
+					if (move_canDynamax_canTera[1] == true) canDynamax = true
+					if (move_canDynamax_canTera[2] == true) canTerastallize = true
 					if (move.endsWith(` zmove`)) {
 						canZMove = false;
 						return move;
@@ -180,26 +196,34 @@ export class RandomPlayerAI extends BattlePlayer {
 				} else {
 					throw new Error(`${this.constructor.name} unable to make choice ${i}. request='${request}',` +
 						` chosen='${chosen}', (mega=${canMegaEvo}, ultra=${canUltraBurst}, zmove=${canZMove},` +
-						` dynamax='${canDynamax}', terastallize=${canTerastallize})`);
+						` dynamax='${canDynamax}')`);
 				}
 			});
 			this.choose(choices.join(`, `));
 		} else {
 			// team preview?
-			this.choose(this.chooseTeamPreview(request.side.pokemon));
+			this.choose(this.chooseTeamPreview(request, request.side.pokemon));
 		}
 	}
 
-	protected chooseTeamPreview(team: AnyObject[]): string {
+	protected chooseTeamPreview(request, team: AnyObject[]): string {
 		return `default`;
 	}
 
-	protected chooseMove(active: AnyObject, moves: {choice: string, move: AnyObject}[]): string {
-		return this.prng.sample(moves).choice;
+	protected chooseMove(request, active: AnyObject, moves: {choice: string, move: AnyObject}[], canDynamax: boolean, canTerastallize: boolean, possibleMoves): [string, boolean, boolean] {
+		return [this.prng.sample(moves).choice, canDynamax, canTerastallize]
 	}
 
-	protected chooseSwitch(active: AnyObject | undefined, switches: {slot: number, pokemon: AnyObject}[]): number {
+	protected chooseSwitch(request, active: AnyObject | undefined, switches: {slot: number, pokemon: AnyObject}[]): number {
 		return this.prng.sample(switches).slot;
+	}
+
+	protected shouldDynamax(request, canDynamax: Boolean) {
+		return canDynamax
+	}
+
+	protected shouldTera(request, canTerastallize: Boolean) {
+		return canTerastallize
 	}
 }
 

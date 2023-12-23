@@ -1105,6 +1105,15 @@ export class Pokemon {
 			baseAbility: this.baseAbility,
 			item: this.item,
 			pokeball: this.pokeball,
+			boosts: this.boosts,
+			position: this.position,
+			baseMaxHp: this.baseMaxhp,
+			battle: this.battle,
+			status: this.status,
+			statusState: this.statusState,
+			volatiles: this.volatiles,
+			trapped: this.trapped,
+			species: this.species
 		};
 		if (this.battle.gen > 6) entry.ability = this.ability;
 		if (this.battle.gen >= 9) {

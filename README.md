@@ -1,3 +1,7 @@
+Pokemon Battle Simulation Environment
+========================================================================
+This is a fork of [Pokémon Showdown](https://github.com/smogon/pokemon-showdown) for my [Pokémon Simulator Environment](https://github.com/cRz-Shadows/Pokemon_Trainer_Tournament_Simulator). We make some alterations to certain files to allow for the bot to view certain aspects of its opponent which it would have access to in a real game, and add a bot in [Simulation-test-1.ts](./sim/examples/simulation-test-1.ts). Note this is for use in the command line simulator environment inside of Showdown, not for the full GUI version.
+
 Pokémon Showdown
 ========================================================================
 

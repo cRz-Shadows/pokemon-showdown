@@ -513,6 +513,7 @@ export class DataMove extends BasicEffect implements Readonly<BasicEffect & Move
 		this.noSketch = !!data.noSketch;
 		this.stab = data.stab || undefined;
 		this.volatileStatus = typeof data.volatileStatus === 'string' ? (data.volatileStatus as ID) : undefined;
+		this.multihit = data.multihit
 
 		if (this.category !== 'Status' && !this.maxMove && this.id !== 'struggle') {
 			this.maxMove = {basePower: 1};
