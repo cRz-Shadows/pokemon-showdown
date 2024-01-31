@@ -394,9 +394,6 @@ export const Conditions: {[k: string]: ConditionData} = {
 			if (data.source.hasAbility('normalize') && this.gen >= 6) {
 				data.moveData.type = 'Normal';
 			}
-			if (data.source.hasAbility('adaptability') && this.gen >= 6) {
-				data.moveData.stab = 2;
-			}
 			const hitMove = new this.dex.Move(data.moveData) as ActiveMove;
 
 			this.actions.trySpreadMoveHit([target], data.source, hitMove, true);
@@ -823,14 +820,10 @@ export const Conditions: {[k: string]: ConditionData} = {
 		onTrapPokemon(pokemon) {
 			pokemon.trapped = true;
 		},
-		// Override No Guard
-		onInvulnerabilityPriority: 2,
-		onInvulnerability(target, source, move) {
-			return false;
-		},
 		onBeforeTurn(pokemon) {
 			this.queue.cancelAction(pokemon);
 		},
+		// Dodging moves is handled in BattleActions#hitStepInvulnerabilityEvent
 	},
 
 	// Arceus and Silvally's actual typing is implemented here.

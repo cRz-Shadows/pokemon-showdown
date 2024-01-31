@@ -167,16 +167,16 @@ async function collectStats(battle: RoomBattle, winner: ID, players: ID[]) {
 		// may need to be raised again if doubles ladder takes off
 		eloFloor = 1300;
 	}
-	if (!formatData || battle.rated < eloFloor) return;
+	if (!formatData || battle.rated < eloFloor || !winner) return;
 	checkRollover();
-	for (const p of players) {
-		const team = await battle.getTeam(p);
+	for (const p of battle.players) {
+		const team = await battle.getPlayerTeam(p);
 		if (!team) return; // ???
 		const mons = team.map(f => getSpeciesName(f, format));
 		for (const mon of mons) {
 			if (!formatData.mons[mon]) formatData.mons[mon] = {timesGenerated: 0, numWins: 0};
 			formatData.mons[mon].timesGenerated++;
-			if (toID(winner) === toID(p)) {
+			if (toID(winner) === toID(p.name)) {
 				formatData.mons[mon].numWins++;
 			}
 		}
