@@ -31,6 +31,7 @@ interface trackerPokemon {
 	sideConditions: {}
 	firstTurn: number
 	protectCount: number
+	FutureSightCounter: number
 	teraType: string | undefined
 }
 
@@ -52,6 +53,7 @@ class activeTracker {
 			sideConditions: {},
 			firstTurn: 0,
 			protectCount: 0,
+			FutureSightCounter: 0,
 			teraType: undefined
 		  };
         this._p2_active = {
@@ -65,6 +67,7 @@ class activeTracker {
 			sideConditions: {},
 			firstTurn: 0,
 			protectCount: 0,
+			FutureSightCounter: 0,
 			teraType: undefined
 		  };
     }
@@ -239,6 +242,10 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 	private SELF_RECOVERY_MOVES = ["healorder", "milkdrink", "recover", "rest", "roost", "slackoff", "softboiled"]
 	private WEATHER_SETUP_MOVES = {"chillyreception":"Snow", "hail":"Hail", "raindance":"RainDance", "sandstorm":"Sandstorm",
 		"snowscape":"Snow", "sunnyday":"SunnyDay"}
+	private SOUND_BASED_MOVES = ["growl", "roar", "sing", "supersonic", "screech", "snore", "healbell", "uproar", "hypervoice",
+		"metalsound", "grasswhistle", "howl", "bugbuzz", "chatter", "round", "echoedvoice", "relicsong", "snarl", "nobleroar", 
+		"disarmingvoice", "partingshot", "boomburst", "confide", "sparklingaria", "clangingscales", "clangoroussoulblaze",
+		"clangoroussoul", "overdrive", "eeriespell", "torchsong", "alluringvoice", "psychicnoise"]
     private SPEED_TIER_COEFICIENT = 0.1
     private HP_FRACTION_COEFICIENT = 0.4
     private SWITCH_OUT_MATCHUP_THRESHOLD = -2
@@ -414,6 +421,11 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 			mon.protectCount -= 1
 		}
 
+		// update future sight counter if it's been used recently
+		if (mon.FutureSightCounter > 0) {
+			mon.FutureSightCounter -= 1
+		}
+
 		const currentWeather = request.side.pokemon[0].battle.field.weather
 		const allMoves = possibleMoves
 
@@ -441,7 +453,7 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 			// Fake Out
 				// If pokemon's first turn out and opponent isn't immune use fake out
 			for (var move of possibleMoves) {
-				if ((move.id || move.move) == "fakeout" && mon.firstTurn == 1 && !("Ghost" in Dex.species.get(opponent.species).types)) {
+				if ((move.id || move.move) == "fakeout" && mon.firstTurn == 1 && !Dex.species.get(opponent.species).types.includes("Ghost")) {
 					mon.firstTurn = 0
 					return [this._getMoveSlot((move.id || move.move), allMoves), false, this.shouldTera(request, canTerastallize)]
 				}
@@ -453,7 +465,7 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 			for (var move of possibleMoves) {
 				if (((move.id || move.move) == "explosion" || (move.id || move.move) == "selfdestruct") 
 				&& mon.currentHpPercent<this.SELF_KO_MOVE_MATCHUP_THRESHOLD && opponent.currentHpPercent>0.5
-				&& !("Ghost" in Dex.species.get(opponent.species).types)) {
+				&& !Dex.species.get(opponent.species).types.includes("Ghost")) {
 					return [this._getMoveSlot((move.id || move.move), allMoves), false, this.shouldTera(request, canTerastallize)]
 				}
 			}
@@ -472,7 +484,7 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 				}
 				// Aurora veil
 				if ((move.id || move.move) == "auroraveil" && !monSideConditionList.includes(move.id || move.move)
-				&& currentWeather == ("Hail" || "Snow")) {
+				&& (currentWeather == "Hail" || currentWeather == "Snow")) {
 					return [this._getMoveSlot((move.id || move.move), allMoves), false, this.shouldTera(request, canTerastallize)]
 				}
 				// Light Screen
@@ -516,9 +528,9 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 				if (
 					(move.id || move.move) == "courtchange" 
 					&& (!(this.ENTRY_HAZARDS.filter(word => monSideConditionList.includes(word)).length === 0)
-					|| oppSideConditionList.includes("tailwind" || "lightscreen" || "reflect"))
-					&& !monSideConditionList.includes("tailwind" || "lightscreen" || "reflect")
-					&& this.ENTRY_HAZARDS.filter(word => oppSideConditionList.includes(word)).length === 0) {
+					|| (oppSideConditionList.includes("tailwind") || oppSideConditionList.includes("lightscreen") || oppSideConditionList.includes("reflect"))
+					&& !(monSideConditionList.includes("tailwind") || monSideConditionList.includes("lightscreen") || monSideConditionList.includes("reflect"))
+					&& this.ENTRY_HAZARDS.filter(word => oppSideConditionList.includes(word)).length === 0) ) {
 					return [this._getMoveSlot((move.id || move.move), allMoves), false, this.shouldTera(request, canTerastallize)]
 				}
 			}
@@ -557,7 +569,7 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 					if ((move.id || move.move) in SETUP_MOVES
 						&& Math.min(...(Object.keys(this._getNonZeroStats((move.id || move.move)))).map(key => mon.boosts[key])) < 6
 					) {
-						if ((move.id || move.move) == "curse" && (("Ghost") in Dex.species.get(mon.species).types)){
+						if ((move.id || move.move) == "curse" && (Dex.species.get(opponent.species).types.includes("Ghost"))){
 							continue; // curse isn't a set up move for ghost types
 						}
 						else {
@@ -572,30 +584,41 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 			for (var move of possibleMoves) {
 				const activeOpp = request.side.foe.pokemon.filter(mon => mon.isActive == true)[0];
 				// make sure the opponent doesn't already have a status condition
-				if ((Object.keys(activeOpp.volatiles).includes("curse") || activeOpp.status != '')
-				&& opponent.currentHpPercent > 0.6 && mon.currentHpPercent > 0.5) {
+				if ((!(
+					Object.keys(activeOpp.volatiles).includes("curse") || 
+					Object.keys(activeOpp.volatiles).includes("sleep") || 
+					Object.keys(activeOpp.volatiles).includes("leechseed") || 
+					Object.keys(activeOpp.volatiles).includes("substitute") || 
+					Object.keys(activeOpp.volatiles).includes("saltcure")
+				) && (activeOpp.status === ''))
+				&& opponent.currentHpPercent > 0.6 && mon.currentHpPercent > 0.5
+				&& !(request.side.foe.pokemon.ability == ("leafguard") && (currentWeather === "DesolateLand" || currentWeather === "SunnyDay")) // leafguard prevents status conditions in sun
+				) {
 					const cond = STATUS_INFLICTING_MOVES[(move.id || move.move)]
 					switch (cond) {
 						case "burn":
-							if (!("Fire" in Dex.species.get(opponent.species).types) && Dex.species.get(opponent.species).baseStats.atk > 80) {
+							if (!Dex.species.get(opponent.species).types.includes("Fire") && Dex.species.get(opponent.species).baseStats.atk > 80) {
 								return [this._getMoveSlot((move.id || move.move), allMoves), false, this.shouldTera(request, canTerastallize)]
 							}
 							break;
 						case "paralysis":
-							if (!("Electric" in Dex.species.get(opponent.species).types) && Dex.species.get(opponent.species).baseStats.spe > Dex.species.get(mon.species).baseStats.spe) {
+							if (!Dex.species.get(opponent.species).types.includes("Electric") && Dex.species.get(opponent.species).baseStats.spe > Dex.species.get(mon.species).baseStats.spe) {
 								return [this._getMoveSlot((move.id || move.move), allMoves), false, this.shouldTera(request, canTerastallize)]
 							}
 							break;
 						case "sleep":
-							if (!("Grass" in Dex.species.get(opponent.species).types && (move.id || move.move) === "spore" || "sleeppowder")
+							if (!(Dex.species.get(opponent.species).types.includes("Poison") && (move.id || move.move) === "spore" || "sleeppowder")
 							&& Dex.species.get(opponent.species).baseStats.spe > Dex.species.get(mon.species).baseStats.spe
 							&& request.side.foe.pokemon.ability != "insomnia"
-							&& request.side.foe.pokemon.ability != "sweetveil") {
+							&& request.side.foe.pokemon.ability != "sweetveil"
+							&& request.side.foe.pokemon.ability != "vitalspirit"
+							&& ((request.side.foe.pokemon.ability == "soundproof") && (move.id || move.move) == this.SOUND_BASED_MOVES.includes(move.id || move.move))
+							) {
 								return [this._getMoveSlot((move.id || move.move), allMoves), false, this.shouldTera(request, canTerastallize)]
 							}
 							break;
 						case "confusion":
-							if (!(("Poison" || "Steel") in Dex.species.get(opponent.species).types)
+							if (!(Dex.species.get(opponent.species).types.includes("Poison") || Dex.species.get(opponent.species).types.includes("Steel"))
 							&& request.side.foe.pokemon.ability != "magicguard"
 							&& request.side.foe.pokemon.ability != "owntempo"
 							&& request.side.foe.pokemon.ability != "oblivious") {
@@ -603,20 +626,20 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 							}
 							break;
 						case "poison":
-							if (!(("Poison" || "Steel") in Dex.species.get(opponent.species).types)
+							if (!(Dex.species.get(opponent.species).types.includes("Poison") || Dex.species.get(opponent.species).types.includes("Steel"))
 							&& request.side.foe.pokemon.ability != "immunity"
 							&& request.side.foe.pokemon.ability != "magicguard") {
 								return [this._getMoveSlot((move.id || move.move), allMoves), false, this.shouldTera(request, canTerastallize)]
 							}
 							break;
 						case "cursed":
-							if ((("Ghost") in Dex.species.get(mon.species).types)
+							if (Dex.species.get(mon.species).types.includes("Ghost")
 							&& request.side.foe.pokemon.ability != "magicguard") {
 								return [this._getMoveSlot((move.id || move.move), allMoves), false, this.shouldTera(request, canTerastallize)]
 							}
 							break;
 						case "leech":
-							if (!("Grass" in Dex.species.get(opponent.species).types)
+							if (!Dex.species.get(opponent.species).types.includes("Grass")
 							&& request.side.foe.pokemon.ability != "magicguard") {
 								return [this._getMoveSlot((move.id || move.move), allMoves), false, this.shouldTera(request, canTerastallize)]
 							}
@@ -629,7 +652,8 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 				// if you have a good matchup, and the opponent isn't below -1 accuracy
 			for (var move of possibleMoves) {
 				if (mon.currentHpPercent == 1 && this._estimateMatchup(request) > 0
-				&& opponent.boosts["accuracy"] > this.ACCURACY_SWITCH_THRESHOLD) {
+				&& opponent.boosts["accuracy"] > this.ACCURACY_SWITCH_THRESHOLD
+				&& ["flash", "kinesis", "leaftornado", "mirrorshot", "mudbomb", "mudslap", "muddywater", "nightdaze", "octazooka", "sandattack", 'secretpower', 'smokescreen'].includes(move.id || move.move)) {
 					return [this._getMoveSlot((move.id || move.move), allMoves), false, this.shouldTera(request, canTerastallize)]
 				}
 			}
@@ -638,11 +662,11 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 				// Use if protect wasn't used last turn and opponent is poisoned, burned, or if your mon is leech seeded
 			for (var move of possibleMoves) {
 				const activeOpp = request.side.foe.pokemon.filter(mon => mon.isActive == true)[0];
-				if ((move.id || move.move) == ("protect" || "banefulbunker" ||"obstruct" || "craftyshield" || "detect" || "quickguard" || "spikyshield" || "silktrap")) {
+				if (["protect", "banefulbunker", "obstruct", "craftyshield", "detect", "quickguard", "spikyshield", "silktrap"].includes(move.id || move.move)) {
 					// stall out side conditions
 					if (((oppSideConditionList.includes("tailwind" || "lightscreen" || "reflect" || "trickroom")
 					&& !monSideConditionList.includes("tailwind" || "lightscreen" || "reflect")) 
-					|| (Object.keys(activeOpp.volatiles).includes("curse") || activeOpp.status != '')) // opp has no status conditions
+					|| (Object.keys(activeOpp.volatiles).includes("curse") || activeOpp.status != '')) // opp has status conditions
 					&& (mon.protectCount == 0) && (request.side.foe.pokemon.ability != "unseenfist")) {
 						mon.protectCount = 2
 						return [this._getMoveSlot((move.id || move.move), allMoves), false, this.shouldTera(request, canTerastallize)]
@@ -654,16 +678,31 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 			const moveValues: { [move: string]: number } = {};
 			for (const move of possibleMoves) {
 				moveValues[(move.id || move.move)] = Dex.moves.get(move.id || move.move).basePower
-				* (Dex.moves.get((move.id || move.move)).type in Dex.species.get(mon.species).types ? 1.5 : 1)
-				* (Dex.moves.get((move.id || move.move)).category === "Physical" ? physical_ratio : special_ratio)
+				* (Dex.species.get(mon.species).types.includes(Dex.moves.get((move.id || move.move)).type) ? 1.5 : 1)
+				* (Dex.moves.get((move.id || move.move)).category === "Physical" ? physical_ratio : special_ratio) // This line needs to be commended out if running the bot on a generation before the physical special split was introduced
 				* Number(Dex.moves.get((move.id || move.move)).accuracy)
 				* this._expectedHits((move.id || move.move))
 				* this.bestDamageMultiplier(move.id || move.move, opponent.species!, true);
+
+				// we handled status moves earlier, ignore them here
+				if (Dex.moves.get(move.id || move.move).basePower == 0) {
+					moveValues[(move.id || move.move)] = -100
+				}
 
 				// if fakeout wasn't used earlier, it will fail
 				if ((move.id || move.move) == "fakeout") {
 					moveValues[(move.id || move.move)] = 0
                 }
+
+				// if selfdestruct wasn't used earlier, don't use it
+				if ((move.id || move.move) == ("explosion" || "selfdestruct")) {
+					moveValues[(move.id || move.move)] = 0
+                }
+
+				// prioritise sleeptalk if asleep
+				if ((request.side.pokemon.filter(mon => mon.active == true)[0].status == "sleep") && (move.id || move.move) == ("sleeptalk")) {
+					moveValues[(move.id || move.move)] += 5
+				}
 
 				if (
 					(request.side.foe.pokemon.ability == "lightningrod") && Dex.moves.get((move.id || move.move)).type == "electric"
@@ -677,18 +716,34 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 					|| (request.side.foe.pokemon.ability == "immunity") && Dex.moves.get((move.id || move.move)).type == "poison"
 					|| (request.side.foe.pokemon.ability == "eartheater") && Dex.moves.get((move.id || move.move)).type == "ground"
 					|| (request.side.foe.pokemon.ability == "suctioncup") && (move.id || move.move) == ("roar" || "whirlwind")
+					|| (request.side.foe.pokemon.ability == "soundproof") && (move.id || move.move) == this.SOUND_BASED_MOVES.includes(move.id || move.move)
+					|| (request.side.foe.pokemon.filter(mon => mon.isActive == true)[0].status != "sleep") && (move.id || move.move) == ("dreameater")
 				) {
 					moveValues[(move.id || move.move)] = 0;
 				}
+
+				// don't use future sight if it's still on cooldown
+				if ((move.id || move.move) == ("futuresight") && mon.FutureSightCounter != 0) {
+					moveValues[(move.id || move.move)] = 0
+				}
+
 			}
 			const bestMoveValue = Math.max(...Object.values(moveValues));
 			if (!('recharge' in moveValues)) {
 				const bestMove = Object.keys(moveValues).find(m => moveValues[m] === bestMoveValue);
+
+				if (bestMove == "futuresight" && mon.FutureSightCounter == 0) {
+					mon.FutureSightCounter = 3 // 3 because it's decremented before moves are used
+				}
+
 				var should_Dynamax = this.shouldDynamax(request, canDynamax)
-				if (should_Dynamax){
+				var should_Tera = this.shouldTera(request, canTerastallize)
+				if (should_Dynamax) {
 					return [this._getMoveSlot(bestMove!, allMoves), true, false]
-				} else {
+				} else if (should_Tera) {
 					return [this._getMoveSlot(bestMove!, allMoves), false, this.shouldTera(request, canTerastallize)]
+				} else {
+					return [this._getMoveSlot(bestMove!, allMoves), false, false]
 				}
 			} else {
 				return ["move 1", false, false]
@@ -802,7 +857,7 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 	// TODO this doesn't account for terastalised opponents, and just uses the mon's base types
 	// returns the type with the best damage multiplier against the opponent
 	protected bestDamageMultiplier(attacker: string, defender: string, isMove: boolean = false, teraType: string = ""): number {
-		const typeMatchups = JSON.parse(fs.readFileSync("../Data/UsefulDatasets/type-chart.json", 'utf-8'));
+		const typeMatchups = JSON.parse(fs.readFileSync("../Data/UsefulDatasets/gen_9_type-chart.json", 'utf-8'));
 		var attackerTypes;
 		if (isMove) {
 			attackerTypes = [Dex.moves.get(attacker).type, "???"]
@@ -817,11 +872,16 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 		let bestMultiplier = 1
 		let counter = 0
 		for (const attackerType of attackerTypes) {
+			multiplier = 1;
 			for (const defenderType of defenderTypes) {
 				if (!(attackerType=="???") && !(defenderType=="???")
 				&& !(attackerType==undefined) && !(defenderType==undefined)
-				&& !(attackerType=="") && !(defenderType=="")) {
+				&& !(attackerType=="") && !(defenderType=="") &&
+				typeMatchups[attackerType] !== undefined && 
+				typeMatchups[attackerType][defenderType] !== undefined) {
 					multiplier *= Number(typeMatchups[attackerType][defenderType]);
+				} else {
+					multiplier = -5 // discourage unknown move types
 				}
 			}
 			if (counter == 0) {
