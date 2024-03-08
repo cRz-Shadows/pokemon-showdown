@@ -679,7 +679,7 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 			for (const move of possibleMoves) {
 				moveValues[(move.id || move.move)] = Dex.moves.get(move.id || move.move).basePower
 				* (Dex.species.get(mon.species).types.includes(Dex.moves.get((move.id || move.move)).type) ? 1.5 : 1)
-				* (Dex.moves.get((move.id || move.move)).category === "Physical" ? physical_ratio : special_ratio) // This line needs to be commended out if running the bot on a generation before the physical special split was introduced
+				* (Dex.moves.get((move.id || move.move)).category === "Physical" ? physical_ratio : special_ratio) // This line needs to be commented out if running the bot on a generation before the physical special split was introduced
 				* Number(Dex.moves.get((move.id || move.move)).accuracy)
 				* this._expectedHits((move.id || move.move))
 				* this.bestDamageMultiplier(move.id || move.move, opponent.species!, true);
@@ -1003,6 +1003,18 @@ async function main() {
 		formatid: "gen9customgame",
 	};
 	const dex = Dex.forFormat(spec.formatid);
+
+	// // Set ever pokemon's ability to sopmething that doesn't effect battle fr gen 1 simulations
+    // const neutralAbility = 'Illuminate'; // Example ability with no effect in battles
+    // function assignNeutralAbilities(team) {
+    //     if (!team) return;
+    //     for (let pokemon of team) {
+    //         pokemon.ability = neutralAbility; // Overwrite each Pokémon's ability
+    //     }
+    // }
+    // // Assign the neutral ability to all Pokémon in both teams
+    // assignNeutralAbilities(team1);
+    // assignNeutralAbilities(team2);
 
 	const tracker = new activeTracker()
 	const createAI = (s: ObjectReadWriteStream<string>, o: AIOptions) => new HeuristicsPlayerAI(s, o, tracker);
