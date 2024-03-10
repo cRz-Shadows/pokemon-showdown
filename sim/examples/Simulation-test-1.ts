@@ -396,6 +396,10 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
                 return true
 			}
 		}
+		const activeOpp = request.side.foe.pokemon.filter(mon => mon.isActive == true)[0];
+		if (Object.keys(activeOpp.volatiles).includes("perishsong")) {
+			return true
+		}
 		return false
 	}
 
@@ -589,7 +593,8 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 					Object.keys(activeOpp.volatiles).includes("sleep") || 
 					Object.keys(activeOpp.volatiles).includes("leechseed") || 
 					Object.keys(activeOpp.volatiles).includes("substitute") || 
-					Object.keys(activeOpp.volatiles).includes("saltcure")
+					Object.keys(activeOpp.volatiles).includes("saltcure") ||
+					Object.keys(activeOpp.volatiles).includes("confusion")
 				) && (activeOpp.status === ''))
 				&& opponent.currentHpPercent > 0.6 && mon.currentHpPercent > 0.5
 				&& !(request.side.foe.pokemon.ability == ("leafguard") && (currentWeather === "DesolateLand" || currentWeather === "SunnyDay")) // leafguard prevents status conditions in sun
@@ -700,7 +705,7 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
                 }
 
 				// prioritise sleeptalk if asleep
-				if ((request.side.pokemon.filter(mon => mon.active == true)[0].status == "sleep") && (move.id || move.move) == ("sleeptalk")) {
+				if ((request.side.pokemon.filter(mon => mon.active == true)[0].status != "sleep") && (move.id || move.move) == ("sleeptalk") || (move.id || move.move) == ("dreameater")) {
 					moveValues[(move.id || move.move)] += 5
 				}
 
@@ -717,9 +722,9 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 					|| (request.side.foe.pokemon.ability == "eartheater") && Dex.moves.get((move.id || move.move)).type == "ground"
 					|| (request.side.foe.pokemon.ability == "suctioncup") && (move.id || move.move) == ("roar" || "whirlwind")
 					|| (request.side.foe.pokemon.ability == "soundproof") && (move.id || move.move) == this.SOUND_BASED_MOVES.includes(move.id || move.move)
-					|| (request.side.foe.pokemon.filter(mon => mon.isActive == true)[0].status != "sleep") && (move.id || move.move) == ("dreameater")
+					|| (request.side.pokemon.filter(mon => mon.active == true)[0].status != "sleep") && (move.id || move.move) == ("dreameater")
 				) {
-					moveValues[(move.id || move.move)] = 0;
+					moveValues[(move.id || move.move)] = -50; // don't do these
 				}
 
 				// don't use future sight if it's still on cooldown
@@ -793,6 +798,15 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
             //rise in BP for each hit
             return 1 + 2 * 0.9 + 3 * 0.81
 		}
+		if (move == "bonemerang" || move == "doublehit" || move == "doubleironbash" || move == "doublekick" || move == "dragondarts"
+		|| move == "dualchop" || move == "dualwingbeat" || move == "geargrind" || move == "tachyoncutter" || move == "twinbeam" || move == "twineedle") {
+			// Moves that always hit twice
+            return 2
+		}
+		if (move == "surgingstrikes" || move == "tripledive" || move == "watershuriken") {
+            // Moves that always hit 3 times
+            return 3
+		}
 		if (move == "populationbomb") {
             // population bomb hits until it misses, 90% accuracy
             return 7
@@ -801,10 +815,8 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 			// non multihit move
             return 1
 		}
-        else {
-            // It hits 2-5 times
-            return (2 + 3) / 3 + (4 + 5) / 6
-		}
+		// It hits 2-5 times
+		return (2 + 3) / 3 + (4 + 5) / 6
 	}
 
 	// Chooses the best pokemon to switch to
