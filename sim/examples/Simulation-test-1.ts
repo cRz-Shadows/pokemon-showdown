@@ -377,6 +377,9 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 		const opponent = mon_opponent[1]
 		const availableSwitches = (request.side.pokemon).filter((m) => ((m.active == false) && this._getHpFraction(m.condition) != 0))
 
+		// No available switches
+		if (!availableSwitches) return false
+
 		// If there is a decent switch in and not trapped...
 		if (availableSwitches.filter(m => this._estimateMatchup(request) > 0).length && request.side.pokemon.trapped == false) {
 			// ...and a 'good' reason to switch out
@@ -397,7 +400,7 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 			}
 		}
 		const activeOpp = request.side.foe.pokemon.filter(mon => mon.isActive == true)[0];
-		if (Object.keys(activeOpp.volatiles).includes("perishsong")) {
+		if (Object.keys(activeOpp.volatiles).includes("perishsong") || Object.keys(activeOpp.volatiles).includes("perish1")) {
 			return true
 		}
 		return false
@@ -765,9 +768,11 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 		// switch out
 		if (this._should_switch_out(request)) {
 			const availableSwitches = (request.side.pokemon).filter((m) => ((m.active == false) && this._getHpFraction(m.condition) != 0))
-			let bestEstimation = Math.max(...availableSwitches.map(pokemon => this._estimateMatchup(request, pokemon)))
-			let bestMatchup = availableSwitches.find(pokemon => this._estimateMatchup(request, pokemon) === bestEstimation)
-			return ["switch ".concat(this._getPokemonPos(request, bestMatchup)), false, false]
+			if (availableSwitches) {
+				let bestEstimation = Math.max(...availableSwitches.map(pokemon => this._estimateMatchup(request, pokemon)))
+				let bestMatchup = availableSwitches.find(pokemon => this._estimateMatchup(request, pokemon) === bestEstimation)
+				return ["switch ".concat(this._getPokemonPos(request, bestMatchup)), false, false]
+			}
 		}
 		mon.firstTurn = 0
 		// otherwise can't find a good option so use a random move
