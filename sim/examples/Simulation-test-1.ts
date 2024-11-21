@@ -322,7 +322,7 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 			) {
 				return true
 			}
-			// Matchup advantage and full hp on full hp
+			// Matchup advantage and on full hp
 			if ((this._estimateMatchup(request)>0) && mon.currentHpPercent == 1 && opponent.currentHpPercent == 1) {
 				return true
 			}
@@ -591,16 +591,10 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 			for (var move of possibleMoves) {
 				const activeOpp = request.side.foe.pokemon.filter(mon => mon.isActive == true)[0];
 				// make sure the opponent doesn't already have a status condition
-				if ((!(
-					Object.keys(activeOpp.volatiles).includes("curse") || 
-					Object.keys(activeOpp.volatiles).includes("sleep") || 
-					Object.keys(activeOpp.volatiles).includes("leechseed") || 
-					Object.keys(activeOpp.volatiles).includes("substitute") || 
-					Object.keys(activeOpp.volatiles).includes("saltcure") ||
-					Object.keys(activeOpp.volatiles).includes("confusion")
-				) && (activeOpp.status === ''))
-				&& opponent.currentHpPercent > 0.6 && mon.currentHpPercent > 0.5
-				&& !(request.side.foe.pokemon.ability == ("leafguard") && (currentWeather === "DesolateLand" || currentWeather === "SunnyDay")) // leafguard prevents status conditions in sun
+				if ((
+					Object.keys(activeOpp.volatiles).length === 0 && (!activeOpp.status))
+					&& opponent.currentHpPercent > 0.6 && mon.currentHpPercent > 0.5
+					&& !(request.side.foe.pokemon.ability == ("leafguard") && (currentWeather === "DesolateLand" || currentWeather === "SunnyDay")) // leafguard prevents status conditions in sun
 				) {
 					const cond = STATUS_INFLICTING_MOVES[(move.id || move.move)]
 					switch (cond) {
@@ -615,7 +609,7 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 							}
 							break;
 						case "sleep":
-							if (!(Dex.species.get(opponent.species).types.includes("Poison") && (move.id || move.move) === "spore" || "sleeppowder")
+							if (!(Dex.species.get(opponent.species).types.includes("Grass") && (move.id || move.move) === "spore" || "sleeppowder")
 							&& Dex.species.get(opponent.species).baseStats.spe > Dex.species.get(mon.species).baseStats.spe
 							&& request.side.foe.pokemon.ability != "insomnia"
 							&& request.side.foe.pokemon.ability != "sweetveil"
