@@ -370,40 +370,57 @@ export class HeuristicsPlayerAI extends RandomPlayerAI {
 		return false
 	}
 
-	protected _should_switch_out(request) {
+protected _should_switch_out(request) {
 		this._updateActiveTracker(request)
-		const mon_opponent = this._getCurrentPlayer(request)
-		const mon = mon_opponent[0]
-		const opponent = mon_opponent[1]
-		const availableSwitches = (request.side.pokemon).filter((m) => ((m.active == false) && this._getHpFraction(m.condition) != 0))
+		const mon_opponent = this._getCurrentPlayer(request);
+		const mon = mon_opponent[0];
+		const opponent = mon_opponent[1];
+
+		// Exclude fainted or trapped Pokémon and only allow healthy inactive ones
+		const availableSwitches = request.side.pokemon.filter((m) =>
+			m &&
+			m.active === false &&          // Pokémon must be inactive
+			this._getHpFraction(m.condition) !== 0 && // Pokémon must have health
+			!m.fainted &&                  // Avoid fainted Pokémon
+			!m.trapped                     // Avoid trapped Pokémon
+		);
 
 		// No available switches
-		if (!availableSwitches) return false
+		if (!availableSwitches || availableSwitches.length === 0) return false;
 
 		// If there is a decent switch in and not trapped...
-		if (availableSwitches.filter(m => this._estimateMatchup(request) > 0).length && request.side.pokemon.trapped == false) {
+		if (
+			availableSwitches.filter(m => this._estimateMatchup(request) > 0).length &&
+			request.side.pokemon.trapped === false
+		) {
 			// ...and a 'good' reason to switch out
 			if (mon.boosts["accuracy"] <= this.ACCURACY_SWITCH_THRESHOLD) {
-				return true
+				return true;
 			}
-            if (mon.boosts["def"] <= -3 || mon.boosts["spd"] <= -3) {
-                return true
+			if (mon.boosts["def"] <= -3 || mon.boosts["spd"] <= -3) {
+				return true;
 			}
 			if (mon.boosts["atk"] <= -3 && mon.stats["atk"] >= mon.stats["spa"]) {
-				return true
+				return true;
 			}
 			if (mon.boosts["spa"] <= -3 && mon.stats["atk"] <= mon.stats["spa"]) {
-				return true
+				return true;
 			}
 			if (this._estimateMatchup(request) < this.SWITCH_OUT_MATCHUP_THRESHOLD) {
-                return true
+				return true;
 			}
 		}
-		const activeOpp = request.side.foe.pokemon.filter(mon => mon.isActive == true)[0];
-		if (Object.keys(activeOpp.volatiles).includes("perishsong") || Object.keys(activeOpp.volatiles).includes("perish1")) {
-			return true
+
+		// Perish Song: if the opponent has activated perish, consider switching
+		const activeOpp = request.side.foe.pokemon.find(mon => mon.isActive === true);
+		if (
+			activeOpp &&
+			Object.keys(activeOpp.volatiles || {}).some(v => v.includes("perish"))
+		) {
+			return true;
 		}
-		return false
+
+		return false;
 	}
 
 	protected _stat_estimation(mon, stat) {
